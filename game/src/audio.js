@@ -48,11 +48,14 @@ export class AudioEngine {
     this.muted = m;
     if (this.master) this.master.gain.value = m ? 0 : 0.5;
   }
-  setEngine(speed01, on) {
+  setEngine(speed01, on, gear) {
     if (!this.ctx || !this.engineGain) return;
     const t = this.ctx.currentTime;
     this.engineGain.gain.setTargetAtTime(on ? 0.05 + speed01 * 0.07 : 0, t, 0.1);
-    const f = 48 + speed01 * 170;
+    // v4: the engine note steps with the gear band as well as speed —
+    // each gear lifts the base note, so a shift is audible as a step.
+    const gearBase = gear ? 46 + (gear - 1) * 34 : 48;
+    const f = gearBase + speed01 * 120;
     this.engineOsc.frequency.setTargetAtTime(f, t, 0.08);
     this.engineOsc2.frequency.setTargetAtTime(f * 1.02 + 2, t, 0.08);
   }

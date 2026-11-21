@@ -316,7 +316,7 @@ export function update(g, input, dt) {
 function updateEngineSound(g) {
   if (!g.audio.setEngine) return;
   const p = g.player;
-  if (!p.onFoot && p.car) g.audio.setEngine(Math.abs(p.car.speed) / 540, true);
+  if (!p.onFoot && p.car) g.audio.setEngine(Math.abs(p.car.speed) / 540, true, p.car.gear || 1);
   else g.audio.setEngine(0, false);
 }
 
@@ -489,11 +489,16 @@ function updateDriving(g, input, dt) {
   const left = input.down('a') || input.down('ArrowLeft');
   const right = input.down('d') || input.down('ArrowRight');
   const maxSpeed = car.kind === 'police' ? 500 : 540;
+  // v4 damage cost: a battered car loses top speed and steering bite,
+  // so ramming has a handling price as well as smoke and darkened paint.
+  // Kept gentle (10% at most): the hide-step escape still needs the
+  // car to outrun the law, and a heavier cut strands the autopilot.
+  const dmgSlow = Math.min(0.1, (car.damage || 0) / 2000);
   if (fwd) car.speed += 300 * dt;
   if (back) car.speed -= car.speed > 20 ? 460 * dt : 200 * dt;
   if (!fwd && !back) car.speed -= Math.sign(car.speed) * 140 * dt;
   if (Math.abs(car.speed) < 6 && !fwd && !back) car.speed = 0;
-  car.speed = clamp(car.speed, -160, maxSpeed);
+  car.speed = clamp(car.speed, -160, maxSpeed * (1 - dmgSlow));
   // v3 gear bands: four speed bands; crossing one plays the shift
   // chirp, so the engine note steps instead of sliding smoothly.
   const gear = Math.min(4, Math.floor(Math.abs(car.speed) / 135) + 1);
@@ -502,7 +507,7 @@ function updateDriving(g, input, dt) {
   const steerDir = car.speed >= 0 ? 1 : -1;
   // A car can creep-turn at low speed (a three-point turn); it only
   // spins in place when it is truly stopped.
-  const steerAmt = Math.abs(car.speed) > 5 ? 2.4 * dt * steerDir * clamp(Math.abs(car.speed) / 120, 0.15, 1) : 0;
+  const steerAmt = Math.abs(car.speed) > 5 ? 2.4 * dt * steerDir * clamp(Math.abs(car.speed) / 120, 0.15, 1) * (1 - dmgSlow * 0.5) : 0;
   if (left) car.angle -= steerAmt;
   if (right) car.angle += steerAmt;
   // Keep the heading wrapped so it never winds up over a long drive.

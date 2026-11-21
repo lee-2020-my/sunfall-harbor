@@ -173,6 +173,46 @@ export function generateWorld(seed) {
     });
   }
 
+  // v4 parking lots: flat asphalt bays with white bay lines, plus one
+  // more round of plazas and flower beds for the big empty grass
+  // blocks. All appended to the same harbor-detail stream after the
+  // v3 draws, so every v3 position stays exactly where it was.
+  const parkingLots = [];
+  for (let i = 0; i < 8; i += 1) {
+    parkingLots.push({
+      x: drng.range(200, WORLD_W - 260), y: drng.range(200, WORLD_H - 180),
+      w: drng.range(170, 240), h: drng.range(110, 150),
+      bays: drng.int(4, 6),
+    });
+  }
+  for (let i = 0; i < 7; i += 1) {
+    plazas.push({
+      x: drng.range(200, WORLD_W - 200), y: drng.range(200, WORLD_H - 200),
+      w: drng.range(90, 190), h: drng.range(70, 150),
+      shade: drng.pick(['#b8a888', '#a89a80', '#c0b098']),
+    });
+    flowerBeds.push({
+      x: drng.range(120, WORLD_W - 120), y: drng.range(120, WORLD_H - 120),
+      r: drng.range(10, 22),
+      color: drng.pick(['#ff7ab8', '#ffd94a', '#ff5a5a', '#c98aff', '#ffffff']),
+    });
+    flowerBeds.push({
+      x: drng.range(120, WORLD_W - 120), y: drng.range(120, WORLD_H - 120),
+      r: drng.range(10, 22),
+      color: drng.pick(['#ff7ab8', '#ffd94a', '#ff5a5a', '#c98aff', '#ffffff']),
+    });
+  }
+  // v4 cloud shadows: big soft ellipses that drift slowly east across
+  // the city, pure visual dressing on the same stream.
+  const cloudShadows = [];
+  for (let i = 0; i < 4; i += 1) {
+    cloudShadows.push({
+      x: drng.range(0, WORLD_W), y: drng.range(0, WORLD_H),
+      rx: drng.range(280, 480), ry: drng.range(140, 240),
+      speed: drng.range(10, 18),
+    });
+  }
+
   // Beach strip on the east edge, sea beyond it.
   const beach = { x: 3360, y: 0, w: 130, h: WORLD_H };
   const sea = { x: 3490, y: 0, w: 110, h: WORLD_H };
@@ -199,7 +239,7 @@ export function generateWorld(seed) {
   return {
     seed, buildings, trees, lamps, park, harbor, warehouses, piers,
     containers, beach, sea, places, ships, cranes, umbrellas, bushes,
-    grassPatches, plazas, flowerBeds,
+    grassPatches, plazas, flowerBeds, parkingLots, cloudShadows,
     // Parked cars: fixed spots along the roads, shuffled by seed.
     parkedSpots: buildParkedSpots(rng),
   };

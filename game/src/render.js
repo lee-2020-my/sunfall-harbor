@@ -55,6 +55,19 @@ function drawWorld(ctx, g) {
     ctx.fillRect(pz.x - pz.w / 2, pz.y + pz.h / 2 - 6, pz.w, 6);
   }
   ctx.globalAlpha = 1;
+  // v4 parking lots: dark asphalt bays with white bay lines, drawn
+  // with the plazas so the roads and buildings still sit on top.
+  for (const lot of w.parkingLots) {
+    ctx.fillStyle = '#5a5a62';
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(lot.x, lot.y, lot.w, lot.h);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    const bayW = lot.w / lot.bays;
+    for (let b = 1; b < lot.bays; b += 1) ctx.fillRect(lot.x + b * bayW - 1, lot.y + 6, 2, lot.h - 12);
+    ctx.fillRect(lot.x + 6, lot.y + 6, lot.w - 12, 2);
+    ctx.fillRect(lot.x + 6, lot.y + lot.h - 8, lot.w - 12, 2);
+  }
+  ctx.globalAlpha = 1;
   // v3 flower beds: low colour clusters on the grass.
   for (const fb of w.flowerBeds) {
     ctx.fillStyle = 'rgba(60,40,30,0.2)';
@@ -273,6 +286,14 @@ function drawWorld(ctx, g) {
   ctx.lineTo(home.x + 46, home.y - 28);
   ctx.closePath();
   ctx.fill();
+  // v4 cloud shadows: big soft ellipses drifting slowly east, so the
+  // sunlight feels alive. Purely visual, alpha stays low.
+  for (const c of w.cloudShadows) {
+    const span = WORLD_W + c.rx * 2;
+    const cx = ((c.x + g.time * c.speed) % span) - c.rx;
+    ctx.fillStyle = 'rgba(40,40,70,0.07)';
+    ctx.beginPath(); ctx.ellipse(cx, c.y, c.rx, c.ry, 0, 0, Math.PI * 2); ctx.fill();
+  }
 }
 
 function drawObjective(ctx, g) {
@@ -576,6 +597,26 @@ function drawHud(ctx, g) {
   const clock = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
   const speed = p.onFoot ? Math.round(p.speed * 0.09) : Math.round(Math.abs(p.car ? p.car.speed : 0) * 0.18);
   ctx.fillText(`${clock}   ${p.onFoot ? 'ON FOOT' : `${speed} km/h`}`, VIEW_W - 252, 60);
+  // v4 rev bar: a thin tachometer under the wanted panel that climbs
+  // inside each gear band and drops on the shift, so acceleration reads.
+  if (!p.onFoot && p.car) {
+    const gear = p.car.gear || 1;
+    const spd = Math.abs(p.car.speed || 0);
+    const rpm01 = Math.max(0, Math.min(1, (spd - (gear - 1) * 135) / 135));
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    roundRect(ctx, VIEW_W - 264, 76, 250, 16, 8);
+    ctx.fill();
+    if (rpm01 > 0.02) {
+      ctx.fillStyle = rpm01 > 0.85 ? '#ff5a5a' : '#ffd94a';
+      roundRect(ctx, VIEW_W - 260, 80, 184 * rpm01, 8, 4);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`GEAR ${gear}`, VIEW_W - 18, 88);
+    ctx.textAlign = 'left';
+  }
   // Mission banner, with a live countdown on timed jobs and a
   // hide-progress readout on lay-low steps.
   const m = currentMission(g);
@@ -645,9 +686,12 @@ function drawHud(ctx, g) {
     if (sx < 60 || sx > VIEW_W - 60 || sy < 60 || sy > VIEW_H - 60) {
       const cx = Math.max(60, Math.min(VIEW_W - 60, sx));
       const cy = Math.max(60, Math.min(VIEW_H - 60, sy));
+      // v4: keep the arrow clear of the top-left money panel — nudge it
+      // below the box instead of letting it sit on the HP/ammo readout.
+      const ay = (cx < 292 && cy < 118) ? 118 : cy;
       const a = Math.atan2(sy - 360, sx - 640);
       ctx.save();
-      ctx.translate(cx, cy);
+      ctx.translate(cx, ay);
       ctx.rotate(a);
       ctx.fillStyle = '#ffd94a';
       ctx.beginPath();
@@ -724,8 +768,12 @@ function drawMinimap(ctx, g) {
   ctx.restore();
   ctx.strokeStyle = '#ffffff';
   ctx.lineWidth = 2;
+  // v4: clamp the player ring inside the minimap frame so it is never
+  // sliced by the border when the player hugs the edge of the city.
+  const mpx = Math.max(ox + 8, Math.min(ox + mw - 8, ox + g.player.x * S));
+  const mpy = Math.max(oy + 8, Math.min(oy + mh - 8, oy + g.player.y * S));
   ctx.beginPath();
-  ctx.arc(ox + g.player.x * S, oy + g.player.y * S, 6, 0, Math.PI * 2);
+  ctx.arc(mpx, mpy, 6, 0, Math.PI * 2);
   ctx.stroke();
 }
 
@@ -849,9 +897,14 @@ function drawTitle(ctx, g) {
     ctx.font = 'bold 22px sans-serif';
     ctx.fillText('PRESS ENTER TO START', 640, 470);
   }
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.font = '13px sans-serif';
-  ctx.fillText('An original game. No affiliation with any commercial series.', 640, 560);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = '15px sans-serif';
+  // v4: the credit line now sits in the open sea band with a dark
+  // outline, clear of the skyline silhouettes it used to cross.
+  ctx.strokeStyle = 'rgba(20,10,30,0.9)';
+  ctx.lineWidth = 4;
+  ctx.strokeText('An original game. No affiliation with any commercial series.', 640, 682);
+  ctx.fillText('An original game. No affiliation with any commercial series.', 640, 682);
   if (g.best > 0) {
     ctx.fillStyle = '#ffffff';
     ctx.fillText(`Best haul so far: $${g.best}`, 640, 520);
@@ -922,17 +975,21 @@ function drawOver(ctx, g) {
     // of the centred title, subtitle and stats lines they used to cross.
     const bursts = [
       { x: 220, y: 170, color: '#ffd94a' },
-      { x: 1060, y: 150, color: '#ff7ab8' },
+      { x: 880, y: 150, color: '#ff7ab8' },
       { x: 150, y: 330, color: '#7ab8ff' },
       { x: 1130, y: 360, color: '#7ae87a' },
-      { x: 640, y: 110, color: '#ff9a5a' },
+      { x: 640, y: 110, color: '#ff9a5a', bright: true },
     ];
     bursts.forEach((b, i) => {
       const phase = ((g.time * 0.55 + i * 0.37) % 1);
       const r = 12 + phase * 90;
-      ctx.globalAlpha = Math.max(0, 1 - phase);
+      // v4: the top-edge burst keeps a brightness floor and a thicker
+      // outer ring, so it still reads at the end of its fade loop; the
+      // right-upper burst moved to x 880, clear of the sun halo.
+      const fade = b.bright ? Math.max(0.45, 1 - phase) : Math.max(0, 1 - phase);
+      ctx.globalAlpha = fade;
       ctx.strokeStyle = b.color;
-      ctx.lineWidth = 6;
+      ctx.lineWidth = b.bright ? 8 : 6;
       ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2); ctx.stroke();
       for (let s = 0; s < 14; s += 1) {
         const a = (s / 14) * Math.PI * 2 + i;
@@ -943,13 +1000,23 @@ function drawOver(ctx, g) {
       }
       // v3 second ring: a smaller, brighter inner ring plus a hot core,
       // so each burst reads as a firework instead of a faint circle.
-      ctx.globalAlpha = Math.max(0, 1 - phase) * 0.9;
+      ctx.globalAlpha = fade * 0.9;
       ctx.lineWidth = 5;
       ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.45, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.arc(b.x, b.y, 6, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = b.color;
       ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, Math.PI * 2); ctx.fill();
+      // v4 third ring on the bright top-edge burst: a wide glow ring
+      // that keeps the highest firework visible against the dark sky.
+      if (b.bright) {
+        ctx.globalAlpha = fade * 0.8;
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = 8;
+        ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.7, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(b.x, b.y, 9, 0, Math.PI * 2); ctx.fill();
+      }
     });
     ctx.globalAlpha = 1;
   }
