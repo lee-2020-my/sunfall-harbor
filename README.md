@@ -10,11 +10,26 @@ A sun-soaked open-world crime game in the spirit of GTA 6, built from scratch in
 
 Sunfall Harbor is a 3600×2600 procedurally generated seaside city: a 5×4 avenue grid, a park, a beach and a working harbor with piers, warehouses and shipping containers. The same seed always builds the same city (`?seed=` changes it).
 
+## The story
+
+It is golden hour in Sunfall Harbor, and three people want three jobs done before the sun goes down. Danny Cole needs a package lifted off Pier 3. Mara Voss wants the pink coupe uptown — clean, no scratches. Kane Dray is done talking: three men are waiting at the Harbor Yard with guns, and after that the whole harbor will be looking for you. Take the jobs, take the money, and be home before the heat catches up.
+
+## How it plays
+
+You start on foot in your own neighbourhood and the city is open from the first second: steal any car, drive anywhere, and the law reacts to everything you do. Every job is a short chain of different steps — drive somewhere, slip in on foot, steal a specific car, beat a delivery clock, win a shootout, then go dark until the heat cools off — so no two missions play the same way. Wanted stars climb when you steal, hit pedestrians or shoot, police cars chase and ram you, and foot cops run you down and arrest you on touch. Break line of sight and stay hidden to drop a star at a time.
+
+## What makes it Sunfall Harbor
+
+- **A city with a sunset in it:** long shadows stretch east, building windows glow warm, the sea glitters under a low sun, and the harbor skyline lights up as dusk falls.
+- **Traffic that behaves:** cars drive the lanes and brake for the car ahead, pedestrians keep to the sidewalks and scatter from a speeding car.
+- **Cars with a memory:** hard hits dent your car — a battered car darkens and smokes — and the engine note steps through gear bands as you accelerate.
+- **Deterministic by design:** the same seed always builds the same city and the same story, so every run is fair and every screenshot is reproducible.
+
 ## Play
 
 - **On foot:** WASD / arrows to walk, Shift to run, Space to punch, mouse to shoot the pistol, R to reload.
 - **Driving:** E to steal a car and get in, W/S to accelerate and brake, A/D to steer. Parked and moving cars can both be taken — stealing raises your wanted level.
-- **The law:** 0–5 wanted stars. Stealing cars, hitting pedestrians and shooting all raise the heat. Police cars chase and ram you; foot cops run you down and arrest you on touch. Break line of sight and stay hidden for 14 seconds to drop a star.
+- **The law:** 0–5 wanted stars. Stealing cars, hitting pedestrians and shooting all raise the heat. Police cars chase and ram you; foot cops run you down and arrest you on touch. Break line of sight and stay hidden for 14 seconds to drop a star. After the showdown, going dark for 7 seconds banks the escape.
 - **Traffic & pedestrians:** cars drive the lanes and brake for the car ahead; pedestrians keep to the sidewalks and scatter from a speeding car.
 - **Missions:** three jobs from Danny Cole, Mara Voss and Kane Dray, with a story arc:
   1. **The Package** — lift a package off Pier 3, deliver it to Danny's Garage ($400).
@@ -43,4 +58,4 @@ Or serve `game/` with any static file server. The game runs fully offline.
 
 ## Entry
 
-Built for the make.fun competition **gta6-01 "Make GTA 6"**. `main.ts` copies `game/` and `screenshots/` to the output directory and writes `dossier.json` with the kit's `buildDossier`.
+Built for the make.fun competition **gta6-01 "Make GTA 6"** — bounty page: https://make.fun/bounty/gta6-01. `main.ts` copies `game/` and `screenshots/` to the output directory and writes `dossier.json` with the kit's `buildDossier`.

@@ -96,6 +96,22 @@ export class AudioEngine {
   pickup() { this.blip(660, 0.09, 'sine', 0.2); setTimeout(() => this.blip(990, 0.12, 'sine', 0.2), 70); }
   siren() { this.blip(720, 0.5, 'sine', 0.07, 980); }
   crash() { this.noise(0.25, 0.45, 700); }
+  // v3: a low collision thud under the crash hiss — a short filtered
+  // noise burst plus a 70 Hz sine drop, so impacts feel heavy, not tinny.
+  thud() {
+    if (!this.ctx || this.muted) return;
+    this.noise(0.16, 0.5, 240);
+    this.blip(90, 0.18, 'sine', 0.5, 42);
+  }
+  // v3: gear-shift chirp — a quick rising blip each time the engine
+  // steps into the next gear band, so acceleration has audible steps.
+  gearShift() {
+    this.blip(320, 0.07, 'square', 0.09, 520);
+    setTimeout(() => this.blip(520, 0.06, 'square', 0.07, 640), 45);
+  }
+  // v3: tyre scrape for hard drifting — a longer, airier skid layer
+  // than the short brake skid, so sliding sounds different from braking.
+  scrape() { this.noise(0.32, 0.13, 1500); }
   missionComplete() {
     const notes = [523, 659, 784, 1047];
     notes.forEach((n, i) => setTimeout(() => this.blip(n, 0.22, 'triangle', 0.22), i * 110));

@@ -152,6 +152,26 @@ export function generateWorld(seed) {
       shade: drng.pick(['#9ab86a', '#b8c078', '#c9b878', '#8aa85e', '#c2a868']),
     });
   }
+  // v3 paved plazas and flower beds: flat ground dressing drawn under
+  // the buildings, so they can only fill empty grass — never cover a
+  // road, a doorway or a mission marker. Same harbor-detail stream as
+  // the v2 bushes, so v1 building and parking layouts never move.
+  const plazas = [];
+  for (let i = 0; i < 12; i += 1) {
+    plazas.push({
+      x: drng.range(200, WORLD_W - 200), y: drng.range(200, WORLD_H - 200),
+      w: drng.range(90, 190), h: drng.range(70, 150),
+      shade: drng.pick(['#b8a888', '#a89a80', '#c0b098']),
+    });
+  }
+  const flowerBeds = [];
+  for (let i = 0; i < 26; i += 1) {
+    flowerBeds.push({
+      x: drng.range(120, WORLD_W - 120), y: drng.range(120, WORLD_H - 120),
+      r: drng.range(10, 22),
+      color: drng.pick(['#ff7ab8', '#ffd94a', '#ff5a5a', '#c98aff', '#ffffff']),
+    });
+  }
 
   // Beach strip on the east edge, sea beyond it.
   const beach = { x: 3360, y: 0, w: 130, h: WORLD_H };
@@ -179,7 +199,7 @@ export function generateWorld(seed) {
   return {
     seed, buildings, trees, lamps, park, harbor, warehouses, piers,
     containers, beach, sea, places, ships, cranes, umbrellas, bushes,
-    grassPatches,
+    grassPatches, plazas, flowerBeds,
     // Parked cars: fixed spots along the roads, shuffled by seed.
     parkedSpots: buildParkedSpots(rng),
   };

@@ -38,7 +38,10 @@ export const MISSIONS = [
     steps: [
       { type: 'goto', label: 'Get to the Harbor Yard', key: 'showdown' },
       { type: 'kill', label: 'Take down Rico, Marco and Vince', key: 'showdown' },
-      { type: 'hide', label: 'Stay out of sight until the heat cools off', key: 'showdown', hideNeed: 10 },
+      // v3: the hide only needs 7 s of darkness now — at 10 s the
+      // showdown's tail dragged and the autopilot spent most of the run
+      // sitting still while the cops circled.
+      { type: 'hide', label: 'Stay out of sight until the heat cools off', key: 'showdown', hideNeed: 7 },
       { type: 'escape', label: 'Lose the heat and drive home', key: 'home' },
     ],
   },
@@ -109,6 +112,7 @@ function nullAudio() {
   return {
     ensure: noop, setMuted: noop, setEngine: noop, shoot: noop, punch: noop,
     pickup: noop, siren: noop, crash: noop, skid: noop, missionComplete: noop, wasted: noop,
+    thud: noop, gearShift: noop, scrape: noop,
   };
 }
 
@@ -490,6 +494,11 @@ function updateDriving(g, input, dt) {
   if (!fwd && !back) car.speed -= Math.sign(car.speed) * 140 * dt;
   if (Math.abs(car.speed) < 6 && !fwd && !back) car.speed = 0;
   car.speed = clamp(car.speed, -160, maxSpeed);
+  // v3 gear bands: four speed bands; crossing one plays the shift
+  // chirp, so the engine note steps instead of sliding smoothly.
+  const gear = Math.min(4, Math.floor(Math.abs(car.speed) / 135) + 1);
+  if (car.gear !== undefined && car.gear !== gear && Math.abs(car.speed) > 40) g.audio.gearShift();
+  car.gear = gear;
   const steerDir = car.speed >= 0 ? 1 : -1;
   // A car can creep-turn at low speed (a three-point turn); it only
   // spins in place when it is truly stopped.
@@ -510,6 +519,10 @@ function updateDriving(g, input, dt) {
       g.particles.sparks(car.x, car.y);
       g.particles.addShake(5);
       g.audio.crash();
+      g.audio.thud();
+      // v3 damage: a hard wall hit dents the car; the dent total drives
+      // the smoke and the darkened bodywork drawn in drawCarShape.
+      car.damage = (car.damage || 0) + Math.abs(car.speed) * 0.09;
     }
     car.speed *= 0.55;
     car.x = hit.x; car.y = hit.y;
@@ -525,6 +538,22 @@ function updateDriving(g, input, dt) {
     if (!car.skidCd || car.skidCd <= 0) { g.audio.skid(); car.skidCd = 0.3; }
   }
   if (car.skidCd) car.skidCd -= dt;
+  // v3 damage smoke: a battered car (damage past 80) puffs grey smoke
+  // from the hood until it is abandoned — the visible cost of ramming.
+  car.smokeCd = (car.smokeCd || 0) - dt;
+  if ((car.damage || 0) > 80 && car.smokeCd <= 0) {
+    g.particles.smoke(car.x + Math.cos(car.angle) * 14, car.y + Math.sin(car.angle) * 14, 0, -24);
+    car.smokeCd = 0.22;
+  }
+  // v3 drift feedback: hard steering at speed throws dust, a scrape
+  // sound and a faint shake, so a slide feels different from a cruise.
+  car.driftCd = (car.driftCd || 0) - dt;
+  if (Math.abs(car.speed) > 300 && (left || right) && car.driftCd <= 0) {
+    g.particles.dust(car.x - Math.cos(car.angle) * 20, car.y - Math.sin(car.angle) * 20);
+    g.audio.scrape();
+    g.particles.addShake(1);
+    car.driftCd = 0.4;
+  }
   // Hitting a pedestrian.
   for (const ped of g.peds) {
     if (ped.down) continue;
@@ -552,7 +581,7 @@ function updateDriving(g, input, dt) {
       other.x -= Math.cos(a) * push * 0.5;
       other.y -= Math.sin(a) * push * 0.5;
       if (!car.bumpCd || car.bumpCd <= 0) {
-        if (Math.abs(car.speed) > 200) { g.particles.sparks(car.x, car.y); g.audio.crash(); }
+        if (Math.abs(car.speed) > 200) { g.particles.sparks(car.x, car.y); g.audio.crash(); g.audio.thud(); car.damage = (car.damage || 0) + Math.abs(car.speed) * 0.06; }
         car.speed *= 0.9;
         car.bumpCd = 0.5;
       }
@@ -745,6 +774,8 @@ function updatePolice(g, dt) {
         g.particles.sparks(p.car.x, p.car.y);
         g.particles.addShake(4);
         g.audio.crash();
+        g.audio.thud();
+        p.car.damage = (p.car.damage || 0) + 14;
         car.ramCd = 3;
         car.speed *= -0.4;
       }

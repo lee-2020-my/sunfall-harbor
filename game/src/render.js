@@ -44,6 +44,29 @@ function drawWorld(ctx, g) {
     ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r, p.r * 0.6, 0, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
+  // v3 paved plazas: flat stone squares on the empty grass, drawn
+  // before the roads and buildings so they never cover anything.
+  for (const pz of w.plazas) {
+    ctx.fillStyle = pz.shade;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(pz.x - pz.w / 2, pz.y - pz.h / 2, pz.w, pz.h);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(pz.x - pz.w / 2, pz.y - pz.h / 2, pz.w, 6);
+    ctx.fillRect(pz.x - pz.w / 2, pz.y + pz.h / 2 - 6, pz.w, 6);
+  }
+  ctx.globalAlpha = 1;
+  // v3 flower beds: low colour clusters on the grass.
+  for (const fb of w.flowerBeds) {
+    ctx.fillStyle = 'rgba(60,40,30,0.2)';
+    ctx.beginPath(); ctx.ellipse(fb.x + 2, fb.y + 2, fb.r, fb.r * 0.7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#4a7a42';
+    ctx.beginPath(); ctx.arc(fb.x, fb.y, fb.r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = fb.color;
+    for (let k = 0; k < 5; k += 1) {
+      const a = (k / 5) * Math.PI * 2 + fb.r;
+      ctx.beginPath(); ctx.arc(fb.x + Math.cos(a) * fb.r * 0.55, fb.y + Math.sin(a) * fb.r * 0.55, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
   // Beach sand with speckles, then the sea with slow animated waves.
   ctx.fillStyle = '#e8d8a8';
   ctx.fillRect(w.beach.x, w.beach.y, w.beach.w, w.beach.h);
@@ -285,6 +308,16 @@ function drawCarShape(ctx, car, isPlayer) {
   ctx.fillStyle = 'rgba(20,30,50,0.85)';
   roundRect(ctx, -car.w / 2 + 8, -car.h / 2 + 4, car.w * 0.42, car.h - 8, 4);
   ctx.fill();
+  // v3 damage wash: a battered car darkens toward charcoal as its
+  // damage total climbs, so ramming has a visible cost.
+  const dmg = car.damage || 0;
+  if (dmg > 40) {
+    ctx.globalAlpha = Math.min(0.45, (dmg - 40) / 300);
+    ctx.fillStyle = '#1a1a1a';
+    roundRect(ctx, -car.w / 2, -car.h / 2, car.w, car.h, 8);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
   ctx.fillStyle = 'rgba(200,230,255,0.5)';
   ctx.fillRect(car.w / 2 - 14, -car.h / 2 + 4, 5, car.h - 8);
   // Headlights.
@@ -722,6 +755,19 @@ function drawSunsetBackdrop(ctx, g) {
   ctx.beginPath(); ctx.arc(1130, 130, 190, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#ffd94a';
   ctx.beginPath(); ctx.arc(1130, 130, 62, 0, Math.PI * 2); ctx.fill();
+  // v3 sun: a gradient disc (hot white core fading to amber) and a wide
+  // second halo, so the sun reads as a glowing orb, not a flat coin.
+  const sunCore = ctx.createRadialGradient(1130, 130, 4, 1130, 130, 62);
+  sunCore.addColorStop(0, 'rgba(255,250,220,0.95)');
+  sunCore.addColorStop(0.55, 'rgba(255,217,74,0.9)');
+  sunCore.addColorStop(1, 'rgba(255,150,60,0.85)');
+  ctx.fillStyle = sunCore;
+  ctx.beginPath(); ctx.arc(1130, 130, 62, 0, Math.PI * 2); ctx.fill();
+  const sunWide = ctx.createRadialGradient(1130, 130, 60, 1130, 130, 320);
+  sunWide.addColorStop(0, 'rgba(255,170,80,0.28)');
+  sunWide.addColorStop(1, 'rgba(255,170,80,0)');
+  ctx.fillStyle = sunWide;
+  ctx.beginPath(); ctx.arc(1130, 130, 320, 0, Math.PI * 2); ctx.fill();
   // Sea band and its sun glitter.
   ctx.fillStyle = '#3a6a9a';
   ctx.fillRect(0, 520, VIEW_W, 200);
@@ -730,6 +776,17 @@ function drawSunsetBackdrop(ctx, g) {
     const wob = Math.sin(g.time * 0.8 + i * 1.7) * 14;
     ctx.fillRect(1070 + wob - i * 8, 540 + i * 18, 120 - i * 8, 4);
   }
+  // v3 water shimmer: a second, finer glitter field across the whole
+  // sea band so the water sparkles instead of sitting flat.
+  ctx.fillStyle = 'rgba(255,240,180,0.35)';
+  for (let i = 0; i < 26; i += 1) {
+    const sx = (i * 211 + 90) % 1280;
+    const sy = 528 + ((i * 137) % 180);
+    const tw = 0.5 + 0.5 * Math.sin(g.time * 1.6 + i * 2.3);
+    ctx.globalAlpha = 0.15 + tw * 0.3;
+    ctx.fillRect(sx, sy, 26 - (i % 3) * 6, 3);
+  }
+  ctx.globalAlpha = 1;
   // Harbor skyline silhouette: warehouses, a crane and a boat.
   ctx.fillStyle = '#241a30';
   const skyline = [
@@ -739,6 +796,19 @@ function drawSunsetBackdrop(ctx, g) {
     [1150, 450, 130, 150],
   ];
   for (const [x, y, w, h] of skyline) ctx.fillRect(x, y, w, h);
+  // v3 lit windows: warm pinpricks across the skyline so the city
+  // feels lived-in at dusk. Positions come from a fixed hash of the
+  // window coordinates, so the pattern is identical every frame.
+  ctx.fillStyle = 'rgba(255,217,74,0.9)';
+  for (const [x, y, w, h] of skyline) {
+    for (let wy = y + 16; wy < y + h - 10; wy += 24) {
+      for (let wx = x + 12; wx < x + w - 10; wx += 20) {
+        const f = Math.abs(Math.sin(wx * 12.9898 + wy * 78.233) * 43758.5453) % 1;
+        if (f > 0.42) ctx.fillRect(wx, wy, 6, 9);
+      }
+    }
+  }
+  ctx.fillStyle = '#241a30';
   ctx.fillRect(180, 380, 14, 90);
   ctx.fillRect(110, 380, 160, 10);
   ctx.fillRect(240, 380, 2, 60);
@@ -746,6 +816,14 @@ function drawSunsetBackdrop(ctx, g) {
   ctx.moveTo(1050, 520); ctx.lineTo(1120, 520); ctx.lineTo(1105, 545); ctx.lineTo(1065, 545);
   ctx.closePath(); ctx.fill();
   ctx.fillRect(1080, 490, 4, 32);
+  // v3 boat lights: a warm lamp on the boat's mast and two distant
+  // ship lights on the horizon, so the harbor glows after dark.
+  ctx.fillStyle = '#ffe9a8';
+  ctx.beginPath(); ctx.arc(1082, 488, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 0.7 + 0.3 * Math.sin(g.time * 2.4);
+  ctx.fillRect(180, 512, 5, 5);
+  ctx.fillRect(700, 514, 5, 5);
+  ctx.globalAlpha = 1;
 }
 
 function drawTitle(ctx, g) {
@@ -840,27 +918,36 @@ function drawOver(ctx, g) {
     drawSunsetBackdrop(ctx, g);
     // Firework bursts: fixed launch points, rings that grow and fade on
     // a loop driven by game time, so the victory screen stays deterministic.
+    // v3 firework bursts: pushed to the corners and the top edge, clear
+    // of the centred title, subtitle and stats lines they used to cross.
     const bursts = [
-      { x: 300, y: 200, color: '#ffd94a' },
-      { x: 950, y: 160, color: '#ff7ab8' },
-      { x: 500, y: 300, color: '#7ab8ff' },
-      { x: 1100, y: 260, color: '#7ae87a' },
-      { x: 700, y: 140, color: '#ff9a5a' },
+      { x: 220, y: 170, color: '#ffd94a' },
+      { x: 1060, y: 150, color: '#ff7ab8' },
+      { x: 150, y: 330, color: '#7ab8ff' },
+      { x: 1130, y: 360, color: '#7ae87a' },
+      { x: 640, y: 110, color: '#ff9a5a' },
     ];
     bursts.forEach((b, i) => {
       const phase = ((g.time * 0.55 + i * 0.37) % 1);
       const r = 12 + phase * 90;
       ctx.globalAlpha = Math.max(0, 1 - phase);
       ctx.strokeStyle = b.color;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 6;
       ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2); ctx.stroke();
-      for (let s = 0; s < 10; s += 1) {
-        const a = (s / 10) * Math.PI * 2 + i;
+      for (let s = 0; s < 14; s += 1) {
+        const a = (s / 14) * Math.PI * 2 + i;
         ctx.beginPath();
         ctx.moveTo(b.x + Math.cos(a) * r * 0.55, b.y + Math.sin(a) * r * 0.55);
         ctx.lineTo(b.x + Math.cos(a) * r, b.y + Math.sin(a) * r);
         ctx.stroke();
       }
+      // v3 second ring: a smaller, brighter inner ring plus a hot core,
+      // so each burst reads as a firework instead of a faint circle.
+      ctx.globalAlpha = Math.max(0, 1 - phase) * 0.9;
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.45, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(b.x, b.y, 6, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = b.color;
       ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, Math.PI * 2); ctx.fill();
     });
@@ -897,6 +984,8 @@ function drawOver(ctx, g) {
   if (blink && g.overTimer > 1) {
     ctx.fillStyle = '#ffd94a';
     ctx.font = 'bold 22px sans-serif';
-    ctx.fillText('PRESS ENTER TO PLAY AGAIN', 640, 450);
+    // v3: the prompt sat on the skyline silhouettes at y 450; it now
+    // sits over the open sea band, clear of every building.
+    ctx.fillText('PRESS ENTER TO PLAY AGAIN', 640, 640);
   }
 }
