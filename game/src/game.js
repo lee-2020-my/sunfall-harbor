@@ -19,23 +19,26 @@ export const MISSIONS = [
     brief: 'Danny Cole needs a package lifted off Pier 3 and brought to his garage. No questions, no detours. The harbor crews do not ask twice.',
     steps: [
       { type: 'goto', label: 'Pick up the package at Pier 3', key: 'harborPickup' },
-      { type: 'goto', label: 'Deliver the package to Danny\'s Garage', key: 'garage' },
+      { type: 'timed', label: 'Deliver the package to Danny\'s Garage — beat the clock', key: 'garage', timeLimit: 150 },
     ],
   },
   {
     id: 'hotwheels', name: 'Hot Wheels', contact: 'Mara Voss', reward: 800,
-    brief: 'Mara Voss wants the pink coupe parked uptown. Take it, bring it to the Chop Shop, and do not scratch the paint. She pays for clean work.',
+    brief: 'Mara Voss wants the pink coupe parked uptown. Slip in on foot, take the keys, take the car, bring it to the Chop Shop, and do not scratch the paint. She pays for clean work.',
     steps: [
+      { type: 'goto', label: 'Drive to the pink coupe uptown', key: 'pinkCoupe' },
+      { type: 'walk', label: 'Slip in on foot and grab the coupe keys', key: 'pinkCoupe' },
       { type: 'steal', label: 'Steal the pink coupe', key: 'pinkCoupe', carId: 'pink' },
-      { type: 'deliver', label: 'Deliver the coupe to the Chop Shop', key: 'chopShop', carId: 'pink' },
+      { type: 'timed', label: 'Deliver the coupe to the Chop Shop — beat the clock', key: 'chopShop', carId: 'pink', timeLimit: 180 },
     ],
   },
   {
     id: 'showdown', name: 'Harbor Showdown', contact: 'Kane Dray', reward: 1500,
-    brief: 'Kane Dray is done talking. Rico, Marco and Vince are waiting at the Harbor Yard with guns. Put them down, lose the heat, and drive home.',
+    brief: 'Kane Dray is done talking. Rico, Marco and Vince are waiting at the Harbor Yard with guns. Put them down, go dark until the heat cools off, and drive home.',
     steps: [
       { type: 'goto', label: 'Get to the Harbor Yard', key: 'showdown' },
       { type: 'kill', label: 'Take down Rico, Marco and Vince', key: 'showdown' },
+      { type: 'hide', label: 'Stay out of sight until the heat cools off', key: 'showdown', hideNeed: 10 },
       { type: 'escape', label: 'Lose the heat and drive home', key: 'home' },
     ],
   },
@@ -105,7 +108,7 @@ function nullAudio() {
   const noop = () => {};
   return {
     ensure: noop, setMuted: noop, setEngine: noop, shoot: noop, punch: noop,
-    pickup: noop, siren: noop, crash: noop, missionComplete: noop, wasted: noop,
+    pickup: noop, siren: noop, crash: noop, skid: noop, missionComplete: noop, wasted: noop,
   };
 }
 
@@ -511,10 +514,17 @@ function updateDriving(g, input, dt) {
     car.speed *= 0.55;
     car.x = hit.x; car.y = hit.y;
   }
-  // Brake smoke and dust.
+  // Brake smoke, dust and skid marks when braking hard or sliding.
   if ((back && car.speed > 100) || (fwd && Math.abs(car.speed) > 380)) {
     g.particles.smoke(car.x - Math.cos(car.angle) * 20, car.y - Math.sin(car.angle) * 20, 0, 0);
   }
+  if (back && car.speed > 100) {
+    const rx = car.x - Math.cos(car.angle) * 18;
+    const ry = car.y - Math.sin(car.angle) * 18;
+    g.particles.skid(rx, ry);
+    if (!car.skidCd || car.skidCd <= 0) { g.audio.skid(); car.skidCd = 0.3; }
+  }
+  if (car.skidCd) car.skidCd -= dt;
   // Hitting a pedestrian.
   for (const ped of g.peds) {
     if (ped.down) continue;
@@ -655,7 +665,7 @@ function updatePolice(g, dt) {
     const car = {
       id: `cop-${g.time.toFixed(0)}-${g.copCars.length}`, x, y,
       angle: angleTo(x, y, p.x, p.y), speed: 0, color: '#2a2a3a',
-      kind: 'police', w: 48, h: 22, steer: 0,
+      kind: 'police', w: 56, h: 26, steer: 0,
     };
     g.copCars.push(car);
     g.cars.push(car);
@@ -832,6 +842,58 @@ function updateMissions(g, dt) {
   const step = currentStep(g);
   if (!step || g.mode !== 'play') return;
   const p = g.player;
+  const stepKey = `${g.missionIndex}:${g.missionStep}`;
+  // Timed delivery: a fresh deadline when the step starts. Missing it
+  // costs heat, never the run — the job still pays.
+  if (step.type === 'timed') {
+    if (g.timedStepKey !== stepKey) {
+      g.timedStepKey = stepKey;
+      g.stepDeadline = g.time + (step.timeLimit || 120);
+      g.stepTimedOut = false;
+    }
+    if (!g.stepTimedOut && g.time > g.stepDeadline) {
+      g.stepTimedOut = true;
+      addWanted(g, 2);
+      addMessage(g, 'Too slow — the clock ran out and the heat is on. Finish it anyway.');
+      g.audio.siren();
+    }
+    const t = g.world.places[step.key];
+    const arrived = step.carId
+      ? (!p.onFoot && p.car && p.car.id === step.carId && dist(p.x, p.y, t.x, t.y) < 90)
+      : dist(p.x, p.y, t.x, t.y) < 90;
+    if (arrived) {
+      if (!g.stepTimedOut) {
+        g.money += 100;
+        g.particles.floater(p.x, p.y - 40, '+$100 on time', '#7ae87a');
+        addMessage(g, 'On time. $100 speed bonus.');
+      }
+      completeStep(g);
+    }
+    return;
+  }
+  // On-foot pickup: reach the marker without a car.
+  if (step.type === 'walk') {
+    const t = g.world.places[step.key];
+    if (p.onFoot && dist(p.x, p.y, t.x, t.y) < 90) completeStep(g);
+    return;
+  }
+  // Lay low: bank seconds out of every cop's sight; being spotted only
+  // pauses the count, it never resets it.
+  if (step.type === 'hide') {
+    if (g.wanted === 0) { completeStep(g); return; }
+    if (g.hideStepKey !== stepKey) { g.hideStepKey = stepKey; g.hideProgress = 0; }
+    let nearest = Infinity;
+    for (const car of g.copCars) nearest = Math.min(nearest, dist(car.x, car.y, p.x, p.y));
+    for (const cop of g.cops) nearest = Math.min(nearest, dist(cop.x, cop.y, p.x, p.y));
+    if (nearest > 400) {
+      g.hideProgress += dt;
+      if (g.hideProgress >= (step.hideNeed || 10)) {
+        addMessage(g, 'They lost your trail. Now get home.');
+        completeStep(g);
+      }
+    }
+    return;
+  }
   if (step.type === 'goto' || step.type === 'escape') {
     const t = g.world.places[step.key];
     if (dist(p.x, p.y, t.x, t.y) < 80) {
@@ -887,7 +949,9 @@ export function autopilotInput(g) {
   const step = currentStep(g);
   if (!step || g.mode !== 'play') return input;
   // A foot cop closing in beats everything else: run first, fight later.
-  // Prefer running to your own car so you can drive away from the arrest.
+  // Prefer running to your own car so you can drive away from the arrest —
+  // except on a walk step, where climbing back in just re-triggers the
+  // exit and lets the cop close in during the dance.
   if (p.onFoot && g.cops.length) {
     let nearCop = null; let nearD = 170;
     for (const cop of g.cops) {
@@ -896,7 +960,7 @@ export function autopilotInput(g) {
     }
     if (nearCop) {
       const car = g.lastCar;
-      if (car && dist(p.x, p.y, car.x, car.y) < 500) {
+      if (car && step.type !== 'walk' && dist(p.x, p.y, car.x, car.y) < 500) {
         // Run to the car only when the cop is not standing between you
         // and it — otherwise you run straight into the arrest.
         const aCar = angleTo(p.x, p.y, car.x, car.y);
@@ -913,6 +977,66 @@ export function autopilotInput(g) {
       input.keys.add('Shift');
       return input;
     }
+  }
+  // Hide step: outrun the nearest cop, then sit still and go dark.
+  if (step.type === 'hide') {
+    let nearest = Infinity;
+    for (const c of g.copCars) nearest = Math.min(nearest, dist(p.x, p.y, c.x, c.y));
+    for (const c of g.cops) nearest = Math.min(nearest, dist(p.x, p.y, c.x, c.y));
+    if (nearest < 450) {
+      // On foot, a car is the escape: run to the nearest one and take
+      // it instead of trying to outrun the law on foot.
+      if (p.onFoot) {
+        const car = nearestCar(g, p.x, p.y, 500);
+        if (car) {
+          const d = dist(p.x, p.y, car.x, car.y);
+          if (d < 60) { input.pressed.add('e'); return input; }
+          const a = angleTo(p.x, p.y, car.x, car.y);
+          input.mv = { x: Math.cos(a), y: Math.sin(a) };
+          input.keys.add('Shift');
+          return input;
+        }
+        let bx = 0; let by = 0; let bd = -1;
+        for (const n of g.graph.nodes) {
+          const d = dist(p.x, p.y, n.x, n.y);
+          if (d > bd) { bd = d; bx = n.x; by = n.y; }
+        }
+        const a = angleTo(p.x, p.y, bx, by);
+        input.mv = { x: Math.cos(a), y: Math.sin(a) };
+        input.keys.add('Shift');
+        return input;
+      }
+      // In a car: keep driving for one latched far corner until it is
+      // reached. Re-picking the farthest node every tick made the car
+      // swing back and forth and never open a gap.
+      if (!g.hideTarget || dist(p.x, p.y, g.hideTarget.x, g.hideTarget.y) < 150) {
+        let best = null; let bd = -1;
+        for (const n of g.graph.nodes) {
+          const d = dist(p.x, p.y, n.x, n.y);
+          if (d > bd) { bd = d; best = n; }
+        }
+        if (best) g.hideTarget = { x: best.x, y: best.y };
+      }
+      if (g.hideTarget) {
+        const wp = nextWaypoint(g, g.hideTarget.x, g.hideTarget.y);
+        const desired = angleTo(p.x, p.y, wp.x, wp.y);
+        const diff = angleDiff(p.car.angle, desired);
+        // Slow down for the next corner or the car orbits the waypoint
+        // at full speed and never reaches it.
+        const dWp = dist(p.x, p.y, wp.x, wp.y);
+        if (Math.abs(p.car.speed) > 300 && dWp < 260) input.keys.add('s');
+        else input.keys.add('w');
+        if (diff > 0.12) input.keys.add('d');
+        else if (diff < -0.12) input.keys.add('a');
+      }
+      return input;
+    }
+    return input; // out of sight: stay put and let the timer bank
+  }
+  // Walk step: never in a car. Get out first, then walk the roads.
+  if (step.type === 'walk' && !p.onFoot) {
+    input.pressed.add('e');
+    return input;
   }
   const obj = currentObjective(g);
   if (!obj) return input;
@@ -949,7 +1073,7 @@ export function autopilotInput(g) {
 
   const target = obj;
   const dTarget = dist(p.x, p.y, target.x, target.y);
-  const needCar = dTarget > 300 && step.type !== 'kill';
+  const needCar = dTarget > 300 && step.type !== 'kill' && step.type !== 'walk';
   if (p.onFoot) {
     // Flee a foot cop that is closing in.
     let nearCop = null; let nearD = 170;

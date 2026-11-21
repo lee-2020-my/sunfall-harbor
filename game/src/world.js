@@ -1,7 +1,7 @@
 // Sunfall Harbor city generation. Pure data, fully deterministic for a
 // given seed: roads, blocks, buildings, park, beach, harbor and all the
 // named places the missions use. No DOM, no rendering here.
-import { Rng } from './rng.js';
+import { Rng, streamFor } from './rng.js';
 
 export const WORLD_W = 3600;
 export const WORLD_H = 2600;
@@ -110,6 +110,49 @@ export function generateWorld(seed) {
     });
   }
 
+  // Boats moored at the piers and out in the roads, cranes over the yard,
+  // beach umbrellas, roadside bushes and grass texture patches — all
+  // seeded, so the same seed always builds the same harbor. They draw
+  // from their own stream so the main rng sequence (buildings, parked
+  // spots) stays exactly as v1 built it.
+  const drng = streamFor(seed, 'harbor-detail');
+  const ships = [
+    { x: 3510, y: 300, w: 78, h: 26, color: '#e8e0d0', mast: true },
+    { x: 3512, y: 1500, w: 96, h: 30, color: '#c95a3a', mast: true },
+    { x: 3440, y: 2180, w: 64, h: 22, color: '#3a7ab8', mast: false },
+    { x: 3520, y: 2350, w: 70, h: 24, color: '#4a9a5a', mast: true },
+  ];
+  const cranes = [
+    { x: 2960, y: 2140, h: 150 },
+    { x: 3180, y: 2520, h: 130 },
+  ];
+  const umbrellas = [];
+  for (let y = 180; y < WORLD_H - 100; y += 320) {
+    umbrellas.push({
+      x: 3410, y: y + drng.range(-40, 40),
+      color: drng.pick(['#ff5a5a', '#ffd94a', '#3a7ab8', '#ff7ab8']),
+    });
+  }
+  const bushes = [];
+  for (const cx of COLS) {
+    for (let y = 200; y < WORLD_H - 100; y += 330) {
+      bushes.push({ x: cx + ROAD_W / 2 + 44, y: y + drng.range(-30, 30), r: drng.range(9, 15) });
+    }
+  }
+  for (const ry of ROWS) {
+    for (let x = 200; x < WORLD_W - 100; x += 380) {
+      bushes.push({ x: x + drng.range(-30, 30), y: ry + ROAD_W / 2 + 44, r: drng.range(9, 15) });
+    }
+  }
+  const grassPatches = [];
+  for (let i = 0; i < 70; i += 1) {
+    grassPatches.push({
+      x: drng.range(40, WORLD_W - 40), y: drng.range(40, WORLD_H - 40),
+      r: drng.range(22, 64),
+      shade: drng.pick(['#9ab86a', '#b8c078', '#c9b878', '#8aa85e', '#c2a868']),
+    });
+  }
+
   // Beach strip on the east edge, sea beyond it.
   const beach = { x: 3360, y: 0, w: 130, h: WORLD_H };
   const sea = { x: 3490, y: 0, w: 110, h: WORLD_H };
@@ -135,7 +178,8 @@ export function generateWorld(seed) {
 
   return {
     seed, buildings, trees, lamps, park, harbor, warehouses, piers,
-    containers, beach, sea, places,
+    containers, beach, sea, places, ships, cranes, umbrellas, bushes,
+    grassPatches,
     // Parked cars: fixed spots along the roads, shuffled by seed.
     parkedSpots: buildParkedSpots(rng),
   };

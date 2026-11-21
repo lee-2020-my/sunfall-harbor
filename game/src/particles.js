@@ -37,6 +37,9 @@ export class Particles {
   sparks(x, y) {
     this.spawn(x, y, { count: 10, speedMin: 80, speedMax: 260, life: 0.4, sizeMin: 2, sizeMax: 4, color: '#ffd94a', gravity: 300 });
   }
+  skid(x, y) {
+    this.spawn(x, y, { count: 1, speedMin: 0, speedMax: 6, life: 1.4, sizeMin: 4, sizeMax: 6, color: '#2a2a2a', drag: 1 });
+  }
   muzzle(x, y, angle) {
     this.spawn(x, y, { count: 6, speedMin: 120, speedMax: 260, life: 0.16, sizeMin: 2, sizeMax: 5, color: '#ffe9a8', vx: Math.cos(angle) * 120, vy: Math.sin(angle) * 120 });
   }

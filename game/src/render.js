@@ -23,6 +23,7 @@ export function render(ctx, g) {
   drawParticles(ctx, g);
   ctx.restore();
   drawLighting(ctx, g);
+  drawSpeedLines(ctx, g);
   if (g.mode === 'play' || g.mode === 'paused' || g.mode === 'brief') drawHud(ctx, g);
   if (g.mode === 'play' || g.mode === 'paused' || g.mode === 'brief') drawMinimap(ctx, g);
   if (g.mode === 'title') drawTitle(ctx, g);
@@ -34,16 +35,42 @@ export function render(ctx, g) {
 function drawWorld(ctx, g) {
   const w = g.world;
   const dl = daylight(g);
-  // Ground: warm grass.
+  // Ground: warm grass with seeded texture patches.
   ctx.fillStyle = '#a8b878';
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
-  // Beach sand and sea on the east edge.
+  for (const p of w.grassPatches) {
+    ctx.fillStyle = p.shade;
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r, p.r * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // Beach sand with speckles, then the sea with slow animated waves.
   ctx.fillStyle = '#e8d8a8';
   ctx.fillRect(w.beach.x, w.beach.y, w.beach.w, w.beach.h);
+  ctx.fillStyle = 'rgba(180,150,90,0.5)';
+  for (let y = 20; y < WORLD_H; y += 46) {
+    ctx.fillRect(w.beach.x + 18 + ((y * 37) % 80), y, 5, 3);
+    ctx.fillRect(w.beach.x + 60 + ((y * 53) % 50), y + 22, 4, 3);
+  }
+  // Beach umbrellas.
+  for (const u of w.umbrellas) {
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.ellipse(u.x + 4, u.y + 4, 16, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = u.color;
+    ctx.beginPath(); ctx.arc(u.x, u.y, 15, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#6a4a2a';
+    ctx.fillRect(u.x - 1, u.y, 2, 14);
+  }
   ctx.fillStyle = '#3a8ab8';
   ctx.fillRect(w.sea.x, w.sea.y, w.sea.w, w.sea.h);
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  for (let y = 0; y < WORLD_H; y += 90) ctx.fillRect(w.sea.x, y, 4, 40);
+  ctx.fillStyle = '#5aa8d8';
+  ctx.fillRect(w.sea.x, w.sea.y, 14, w.sea.h);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  for (let y = 0; y < WORLD_H; y += 90) {
+    const sway = Math.sin(g.time * 1.2 + y * 0.05) * 10;
+    ctx.fillRect(w.sea.x + 24 + sway, y, 34, 4);
+    ctx.fillRect(w.sea.x + 66 - sway, y + 45, 26, 4);
+  }
   // Park.
   ctx.fillStyle = '#6aa858';
   ctx.fillRect(w.park.x, w.park.y, w.park.w, w.park.h);
@@ -64,10 +91,63 @@ function drawWorld(ctx, g) {
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.fillRect(c.x, c.y + c.h - 5, c.w, 5);
   }
+  // Harbor cranes: mast, jib and hook line.
+  for (const cr of w.cranes) {
+    ctx.fillStyle = '#e8a03a';
+    ctx.fillRect(cr.x, cr.y - cr.h, 12, cr.h);
+    ctx.fillRect(cr.x - 70, cr.y - cr.h, 150, 10);
+    ctx.fillStyle = '#3a3a42';
+    ctx.fillRect(cr.x + 44, cr.y - cr.h + 10, 2, 44);
+    ctx.fillRect(cr.x + 38, cr.y - cr.h + 54, 14, 10);
+    ctx.fillStyle = '#e8a03a';
+    ctx.beginPath();
+    ctx.moveTo(cr.x - 70, cr.y - cr.h + 10);
+    ctx.lineTo(cr.x + 6, cr.y - cr.h - 26);
+    ctx.lineTo(cr.x + 12, cr.y - cr.h - 26);
+    ctx.lineTo(cr.x - 58, cr.y - cr.h + 10);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Boats: hull, deck, cabin and mast where fitted.
+  for (const s of w.ships) {
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.ellipse(s.x + 4, s.y + s.h / 2 + 4, s.w / 2, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    ctx.moveTo(s.x - s.w / 2, s.y - s.h / 2);
+    ctx.lineTo(s.x + s.w / 2, s.y - s.h / 2);
+    ctx.lineTo(s.x + s.w / 2 - 8, s.y + s.h / 2);
+    ctx.lineTo(s.x - s.w / 2 + 8, s.y + s.h / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(20,40,60,0.8)';
+    ctx.fillRect(s.x - s.w / 4, s.y - s.h / 2 + 3, s.w / 3, s.h / 2 - 4);
+    if (s.mast) {
+      ctx.fillStyle = '#6a4a2a';
+      ctx.fillRect(s.x + s.w / 6, s.y - s.h / 2 - 26, 3, 28);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(s.x + s.w / 6 + 3, s.y - s.h / 2 - 26);
+      ctx.lineTo(s.x + s.w / 6 + 22, s.y - s.h / 2 - 6);
+      ctx.lineTo(s.x + s.w / 6 + 3, s.y - s.h / 2 - 6);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
   // Roads.
   ctx.fillStyle = '#4a4a52';
   for (const cx of COLS) ctx.fillRect(cx - ROAD_W / 2, 0, ROAD_W, WORLD_H);
   for (const ry of ROWS) ctx.fillRect(0, ry - ROAD_W / 2, WORLD_W, ROAD_W);
+  // Zebra crossings at every intersection.
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  for (const cx of COLS) {
+    for (const ry of ROWS) {
+      for (let i = -3; i <= 3; i += 1) {
+        ctx.fillRect(cx + i * 14 - 4, ry - ROAD_W / 2 - 16, 8, 12);
+        ctx.fillRect(cx + i * 14 - 4, ry + ROAD_W / 2 + 4, 8, 12);
+      }
+    }
+  }
   // Road centre dashes.
   ctx.fillStyle = '#e8d878';
   for (const cx of COLS) {
@@ -87,10 +167,11 @@ function drawWorld(ctx, g) {
     ctx.beginPath(); ctx.moveTo(0, ry - ROAD_W / 2 - 4); ctx.lineTo(WORLD_W, ry - ROAD_W / 2 - 4); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0, ry + ROAD_W / 2 + 4); ctx.lineTo(WORLD_W, ry + ROAD_W / 2 + 4); ctx.stroke();
   }
-  // Buildings with long sunset shadows.
+  // Buildings with long sunset shadows, facade bands, awnings, rooftop
+  // boxes and windows that vary lit/dark by building.
   const sunA = 0.9; // sun low in the west, shadows stretch east
   const shadowLen = 26 + (1 - dl) * 30;
-  for (const b of w.buildings) {
+  w.buildings.forEach((b, bi) => {
     ctx.fillStyle = 'rgba(60,40,30,0.28)';
     ctx.beginPath();
     ctx.moveTo(b.x + b.w, b.y);
@@ -103,16 +184,27 @@ function drawWorld(ctx, g) {
     ctx.fillRect(b.x, b.y, b.w, b.h);
     ctx.fillStyle = b.roof;
     ctx.fillRect(b.x + 6, b.y + 6, b.w - 12, b.h - 12);
-    // Windows.
-    ctx.fillStyle = 'rgba(255,240,180,0.85)';
+    // Facade band and awning for depth.
+    ctx.fillStyle = 'rgba(255,255,255,0.14)';
+    ctx.fillRect(b.x, b.y, b.w, 10);
+    ctx.fillStyle = b.roof;
+    ctx.fillRect(b.x, b.y + b.h - 14, b.w, 14);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.fillRect(b.x, b.y + b.h - 14, b.w, 4);
+    // Rooftop box (AC / stairwell), placed by building index.
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    const rx = b.x + 14 + ((bi * 37) % Math.max(1, Math.floor(b.w) - 60));
+    ctx.fillRect(rx, b.y + 12, 30, 20);
+    // Windows: most glow warm at sunset, a few stay dark.
     const colsN = Math.max(1, Math.floor(b.w / 34));
     const rowsN = Math.max(1, Math.floor(b.h / 30));
     for (let i = 0; i < colsN; i += 1) {
       for (let j = 0; j < rowsN; j += 1) {
+        ctx.fillStyle = ((bi * 3 + i * 5 + j * 7) % 5 === 0) ? '#3a3a4a' : 'rgba(255,240,180,0.9)';
         ctx.fillRect(b.x + 12 + i * ((b.w - 24) / colsN), b.y + 12 + j * ((b.h - 24) / rowsN), 10, 12);
       }
     }
-  }
+  });
   // Trees.
   for (const t of w.trees) {
     ctx.fillStyle = 'rgba(60,40,30,0.25)';
@@ -122,9 +214,31 @@ function drawWorld(ctx, g) {
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     ctx.beginPath(); ctx.arc(t.x - t.r * 0.3, t.y - t.r * 0.3, t.r * 0.45, 0, Math.PI * 2); ctx.fill();
   }
-  // Street lamps.
-  ctx.fillStyle = '#3a3a42';
-  for (const l of w.lamps) ctx.fillRect(l.x, l.y, 4, 16);
+  // Roadside bushes with flower dots.
+  for (const b of w.bushes) {
+    ctx.fillStyle = 'rgba(60,40,30,0.2)';
+    ctx.beginPath(); ctx.ellipse(b.x + 3, b.y + 3, b.r, b.r * 0.7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#4a7a42';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff7ab8';
+    ctx.beginPath(); ctx.arc(b.x - b.r * 0.4, b.y - b.r * 0.3, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffd94a';
+    ctx.beginPath(); ctx.arc(b.x + b.r * 0.35, b.y + b.r * 0.2, 2.5, 0, Math.PI * 2); ctx.fill();
+  }
+  // Street lamps: pole, head and a warm glow pool once dusk falls.
+  for (const l of w.lamps) {
+    if (dl < 0.92) {
+      const glow = ctx.createRadialGradient(l.x + 2, l.y + 16, 4, l.x + 2, l.y + 16, 46);
+      glow.addColorStop(0, `rgba(255,220,140,${(0.35 * (0.92 - dl)).toFixed(3)})`);
+      glow.addColorStop(1, 'rgba(255,220,140,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(l.x + 2, l.y + 16, 46, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#3a3a42';
+    ctx.fillRect(l.x, l.y, 4, 16);
+    ctx.fillStyle = dl < 0.92 ? '#ffe9a8' : '#8a8a92';
+    ctx.fillRect(l.x - 2, l.y - 3, 8, 5);
+  }
   // Home marker house.
   const home = w.places.home;
   ctx.fillStyle = '#d9a05a';
@@ -177,15 +291,29 @@ function drawCarShape(ctx, car, isPlayer) {
   ctx.fillStyle = '#fff8c9';
   ctx.fillRect(car.w / 2 - 2, -car.h / 2 + 3, 3, 5);
   ctx.fillRect(car.w / 2 - 2, car.h / 2 - 8, 3, 5);
+  // Brake lights at the rear, brighter when the car is moving fast.
+  const brakeA = 0.55 + Math.min(0.45, Math.abs(car.speed || 0) / 900);
+  ctx.globalAlpha = brakeA;
+  ctx.fillStyle = '#ff2a2a';
+  ctx.fillRect(-car.w / 2, -car.h / 2 + 3, 3, 5);
+  ctx.fillRect(-car.w / 2, car.h / 2 - 8, 3, 5);
+  ctx.globalAlpha = 1;
   if (car.kind === 'police') {
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 9px sans-serif';
+    ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('POLICE', 2, 3);
-    // Light bar.
+    ctx.fillText('POLICE', 2, 4);
+    // Flashing light bar with a red/blue halo that alternates.
     const blink = Math.sin(gTime * 10) > 0;
+    const halo = ctx.createRadialGradient(0, -car.h / 2 - 2, 2, 0, -car.h / 2 - 2, 30);
+    halo.addColorStop(0, blink ? 'rgba(255,58,58,0.55)' : 'rgba(58,122,255,0.55)');
+    halo.addColorStop(1, 'rgba(255,58,58,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(0, -car.h / 2 - 2, 30, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = blink ? '#ff3a3a' : '#3a7aff';
-    ctx.fillRect(-6, -car.h / 2 - 2, 12, 4);
+    ctx.fillRect(-8, -car.h / 2 - 3, 16, 6);
+    ctx.fillStyle = blink ? '#3a7aff' : '#ff3a3a';
+    ctx.fillRect(-8, -car.h / 2 + 3, 16, 3);
   }
   if (isPlayer) {
     ctx.strokeStyle = '#ffd94a';
@@ -217,18 +345,27 @@ function drawCars(ctx, g) {
 function drawPerson(ctx, x, y, angle, color, walkPhase, isPlayer) {
   ctx.save();
   ctx.translate(x, y);
+  // Soft ground shadow.
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.beginPath(); ctx.ellipse(3, 5, 11, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(3, 6, 12, 8, 0, 0, Math.PI * 2); ctx.fill();
   ctx.rotate(angle);
   const bob = Math.sin(walkPhase) * 2;
-  ctx.fillStyle = color;
-  ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
+  // Legs stepping as they walk.
   ctx.fillStyle = '#2a2a2a';
-  ctx.beginPath(); ctx.arc(6 + bob, 0, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(-6, -4 + bob * 0.5, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(-6, 4 - bob * 0.5, 3.5, 0, Math.PI * 2); ctx.fill();
+  // Torso.
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.ellipse(0, 0, 10, 7.5, 0, 0, Math.PI * 2); ctx.fill();
+  // Head, forward of the torso.
+  ctx.fillStyle = '#e8b890';
+  ctx.beginPath(); ctx.arc(9, 0, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#2a2a2a';
+  ctx.beginPath(); ctx.arc(10, -2, 5, Math.PI * 0.9, Math.PI * 2.1); ctx.fill();
   if (isPlayer) {
     ctx.strokeStyle = '#ffd94a';
     ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.stroke();
   }
   ctx.restore();
 }
@@ -330,10 +467,28 @@ function drawParticles(ctx, g) {
   ctx.globalAlpha = 1;
 }
 
+function drawSpeedLines(ctx, g) {
+  const p = g.player;
+  if (p.onFoot || !p.car) return;
+  const sp = Math.abs(p.car.speed);
+  if (sp < 340) return;
+  const a = Math.min(0.28, (sp - 340) / 700);
+  ctx.strokeStyle = `rgba(255,255,255,${a.toFixed(3)})`;
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 10; i += 1) {
+    const y = (i * 97 + g.time * 900) % 720;
+    const len = 50 + (sp / 540) * 70;
+    ctx.beginPath();
+    if (i % 2 === 0) { ctx.moveTo(0, y); ctx.lineTo(len, y); }
+    else { ctx.moveTo(VIEW_W - len, y); ctx.lineTo(VIEW_W, y); }
+    ctx.stroke();
+  }
+}
+
 function drawLighting(ctx, g) {
   const dl = daylight(g);
   // Sunset wash that deepens as night falls.
-  const warm = 0.10 + (1 - dl) * 0.16;
+  const warm = 0.14 + (1 - dl) * 0.18;
   ctx.fillStyle = `rgba(255,140,60,${warm.toFixed(3)})`;
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   if (dl < 0.85) {
@@ -388,7 +543,8 @@ function drawHud(ctx, g) {
   const clock = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
   const speed = p.onFoot ? Math.round(p.speed * 0.09) : Math.round(Math.abs(p.car ? p.car.speed : 0) * 0.18);
   ctx.fillText(`${clock}   ${p.onFoot ? 'ON FOOT' : `${speed} km/h`}`, VIEW_W - 252, 60);
-  // Mission banner.
+  // Mission banner, with a live countdown on timed jobs and a
+  // hide-progress readout on lay-low steps.
   const m = currentMission(g);
   if (m && g.mode === 'play') {
     const step = currentStep(g);
@@ -402,6 +558,24 @@ function drawHud(ctx, g) {
     ctx.fillStyle = '#ffffff';
     ctx.font = '14px sans-serif';
     ctx.fillText(step ? step.label : '', 640, 56);
+    let extra = '';
+    let extraColor = '#ffd94a';
+    if (step && step.type === 'timed' && g.stepDeadline !== undefined && !g.stepTimedOut) {
+      const left = Math.max(0, Math.ceil(g.stepDeadline - g.time));
+      extra = `⏱ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+      if (left < 30) extraColor = '#ff5a5a';
+    } else if (step && step.type === 'timed' && g.stepTimedOut) {
+      extra = 'TOO SLOW';
+      extraColor = '#ff5a5a';
+    } else if (step && step.type === 'hide') {
+      extra = `HIDDEN ${Math.floor(g.hideProgress || 0)}/${step.hideNeed || 10}s`;
+    }
+    if (extra) {
+      ctx.fillStyle = extraColor;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(extra, 940, 36);
+    }
   }
   // Big centre banner (mission start).
   if (g.banner) {
@@ -452,11 +626,12 @@ function drawHud(ctx, g) {
       ctx.restore();
     }
   }
-  // Controls hint.
+  // Controls hint: left-aligned at the bottom-left, short enough to
+  // stay clear of the minimap on a 1280x720 screen.
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
   ctx.font = '12px sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText('WASD move · Shift run · E enter car · Space punch · Click shoot · R reload · P pause · M mute', VIEW_W - 16, VIEW_H - 12);
+  ctx.textAlign = 'left';
+  ctx.fillText('WASD move · Shift run · E car · Space punch · Click shoot · R reload · P pause · M mute', 14, VIEW_H - 12);
 }
 
 function drawMinimap(ctx, g) {
@@ -473,6 +648,8 @@ function drawMinimap(ctx, g) {
   ctx.scale(S, S);
   ctx.fillStyle = '#5a7a4a';
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+  ctx.fillStyle = '#e8d8a8';
+  ctx.fillRect(g.world.beach.x, 0, g.world.beach.w, WORLD_H);
   ctx.fillStyle = '#3a8ab8';
   ctx.fillRect(g.world.sea.x, 0, g.world.sea.w, WORLD_H);
   ctx.fillStyle = '#6aa858';
@@ -487,15 +664,30 @@ function drawMinimap(ctx, g) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   };
   const obj = currentObjective(g);
-  if (obj && g.mode === 'play') dot(obj.x, obj.y, '#ffd94a', 46);
+  // Pulsing objective marker.
+  if (obj && g.mode === 'play') {
+    const pr = 40 + Math.sin(g.time * 5) * 16;
+    ctx.strokeStyle = '#ffd94a';
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.arc(obj.x, obj.y, pr, 0, Math.PI * 2); ctx.stroke();
+    dot(obj.x, obj.y, '#ffd94a', 46);
+  }
   for (const car of g.cars) {
-    if (car.kind === 'police') dot(car.x, car.y, '#3a7aff', 34);
+    if (car.kind === 'police') {
+      dot(car.x, car.y, '#3a7aff', 34);
+      ctx.strokeStyle = '#ff3a3a';
+      ctx.lineWidth = 10;
+      ctx.beginPath(); ctx.arc(car.x, car.y, 34, 0, Math.PI * 2); ctx.stroke();
+    }
     else if (car.id === 'pink') dot(car.x, car.y, '#ff7ab8', 34);
     else if (car.kind === 'traffic') dot(car.x, car.y, '#cccccc', 22);
   }
   for (const e of g.enemies) if (e.hp > 0) dot(e.x, e.y, '#ff3a3a', 30);
   for (const cop of g.cops) dot(cop.x, cop.y, '#3a7aff', 26);
   dot(g.player.x, g.player.y, '#ffffff', 30);
+  ctx.strokeStyle = '#ffd94a';
+  ctx.lineWidth = 10;
+  ctx.beginPath(); ctx.arc(g.player.x, g.player.y, 30, 0, Math.PI * 2); ctx.stroke();
   ctx.restore();
   ctx.strokeStyle = '#ffffff';
   ctx.lineWidth = 2;
@@ -509,8 +701,56 @@ function overlay(ctx, alpha) {
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 }
 
+// Sunset sky, low sun and a dark harbor skyline — shared backdrop for
+// the title and victory screens so they read as Sunfall Harbor, not a
+// black void.
+function drawSunsetBackdrop(ctx, g) {
+  const grad = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+  grad.addColorStop(0, '#ff7a3a');
+  grad.addColorStop(0.45, '#ff4a6a');
+  grad.addColorStop(0.8, '#6a2a5a');
+  grad.addColorStop(1, '#2a1a3a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  // Low sun with a warm halo, tucked in the upper-right corner clear
+  // of the centred title text.
+  const halo = ctx.createRadialGradient(1130, 130, 10, 1130, 130, 190);
+  halo.addColorStop(0, 'rgba(255,217,74,0.9)');
+  halo.addColorStop(0.4, 'rgba(255,150,60,0.45)');
+  halo.addColorStop(1, 'rgba(255,150,60,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(1130, 130, 190, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ffd94a';
+  ctx.beginPath(); ctx.arc(1130, 130, 62, 0, Math.PI * 2); ctx.fill();
+  // Sea band and its sun glitter.
+  ctx.fillStyle = '#3a6a9a';
+  ctx.fillRect(0, 520, VIEW_W, 200);
+  ctx.fillStyle = 'rgba(255,217,74,0.5)';
+  for (let i = 0; i < 8; i += 1) {
+    const wob = Math.sin(g.time * 0.8 + i * 1.7) * 14;
+    ctx.fillRect(1070 + wob - i * 8, 540 + i * 18, 120 - i * 8, 4);
+  }
+  // Harbor skyline silhouette: warehouses, a crane and a boat.
+  ctx.fillStyle = '#241a30';
+  const skyline = [
+    [0, 470, 120, 130], [130, 430, 90, 170], [230, 480, 150, 120],
+    [390, 440, 100, 160], [500, 490, 130, 110], [640, 450, 110, 150],
+    [760, 480, 140, 120], [910, 430, 100, 170], [1020, 470, 120, 130],
+    [1150, 450, 130, 150],
+  ];
+  for (const [x, y, w, h] of skyline) ctx.fillRect(x, y, w, h);
+  ctx.fillRect(180, 380, 14, 90);
+  ctx.fillRect(110, 380, 160, 10);
+  ctx.fillRect(240, 380, 2, 60);
+  ctx.beginPath();
+  ctx.moveTo(1050, 520); ctx.lineTo(1120, 520); ctx.lineTo(1105, 545); ctx.lineTo(1065, 545);
+  ctx.closePath(); ctx.fill();
+  ctx.fillRect(1080, 490, 4, 32);
+}
+
 function drawTitle(ctx, g) {
-  overlay(ctx, 0.72);
+  drawSunsetBackdrop(ctx, g);
+  overlay(ctx, 0.45);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffd94a';
   ctx.font = 'bold 64px sans-serif';
@@ -596,7 +836,37 @@ function drawPaused(ctx, g) {
 
 function drawOver(ctx, g) {
   const win = g.outcome === 'win';
-  overlay(ctx, win ? 0.55 : 0.72);
+  if (win) {
+    drawSunsetBackdrop(ctx, g);
+    // Firework bursts: fixed launch points, rings that grow and fade on
+    // a loop driven by game time, so the victory screen stays deterministic.
+    const bursts = [
+      { x: 300, y: 200, color: '#ffd94a' },
+      { x: 950, y: 160, color: '#ff7ab8' },
+      { x: 500, y: 300, color: '#7ab8ff' },
+      { x: 1100, y: 260, color: '#7ae87a' },
+      { x: 700, y: 140, color: '#ff9a5a' },
+    ];
+    bursts.forEach((b, i) => {
+      const phase = ((g.time * 0.55 + i * 0.37) % 1);
+      const r = 12 + phase * 90;
+      ctx.globalAlpha = Math.max(0, 1 - phase);
+      ctx.strokeStyle = b.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2); ctx.stroke();
+      for (let s = 0; s < 10; s += 1) {
+        const a = (s / 10) * Math.PI * 2 + i;
+        ctx.beginPath();
+        ctx.moveTo(b.x + Math.cos(a) * r * 0.55, b.y + Math.sin(a) * r * 0.55);
+        ctx.lineTo(b.x + Math.cos(a) * r, b.y + Math.sin(a) * r);
+        ctx.stroke();
+      }
+      ctx.fillStyle = b.color;
+      ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+  }
+  overlay(ctx, win ? 0.35 : 0.72);
   ctx.textAlign = 'center';
   if (win) {
     ctx.fillStyle = '#ffd94a';

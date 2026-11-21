@@ -52,7 +52,7 @@ export class AudioEngine {
     if (!this.ctx || !this.engineGain) return;
     const t = this.ctx.currentTime;
     this.engineGain.gain.setTargetAtTime(on ? 0.05 + speed01 * 0.07 : 0, t, 0.1);
-    const f = 50 + speed01 * 130;
+    const f = 48 + speed01 * 170;
     this.engineOsc.frequency.setTargetAtTime(f, t, 0.08);
     this.engineOsc2.frequency.setTargetAtTime(f * 1.02 + 2, t, 0.08);
   }
@@ -91,6 +91,7 @@ export class AudioEngine {
     src.start(t);
   }
   shoot() { this.noise(0.14, 0.5, 2600); this.blip(180, 0.08, 'square', 0.2, 60); }
+  skid() { this.noise(0.18, 0.16, 900); }
   punch() { this.noise(0.08, 0.25, 500); }
   pickup() { this.blip(660, 0.09, 'sine', 0.2); setTimeout(() => this.blip(990, 0.12, 'sine', 0.2), 70); }
   siren() { this.blip(720, 0.5, 'sine', 0.07, 980); }

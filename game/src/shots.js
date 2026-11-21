@@ -25,30 +25,32 @@ function enterInput() {
   return input;
 }
 
-// Start screen.
+// Start screen: camera over the harbor so the title sits on the docks.
 export function shotStart(g) {
   g.mode = 'title';
   g.time = 12;
-  g.camera.x = g.world.places.playerStart.x;
-  g.camera.y = g.world.places.playerStart.y;
+  g.camera.x = 3200;
+  g.camera.y = 2220;
 }
 
-// Mid-mission driving on the avenues.
+// Mid-mission driving along the harbor front: beach and sea on the
+// right, cranes and containers on the left.
 export function shotPlay(g) {
   startMission(g, 0);
   g.briefTimer = 1;
   stepGame(g, enterInput(), 2);
-  // Put the player in a car on the main avenue, mid-delivery.
+  // Put the player in a car driving north past the harbor yard, with
+  // the beach and sea in frame to the east.
   const car = g.cars.find((c) => c.kind === 'parked');
-  car.x = 1700; car.y = 950; car.angle = 0; car.speed = 300;
+  car.x = 3300; car.y = 2250; car.angle = -Math.PI / 2; car.speed = 320;
   g.player.onFoot = false;
   g.player.car = car;
   car.kind = 'driven';
   g.player.x = car.x; g.player.y = car.y;
-  g.player.angle = 0;
+  g.player.angle = -Math.PI / 2;
   g.missionStep = 1;
   g.money = 400;
-  g.camera.x = car.x;
+  g.camera.x = car.x - 60;
   g.camera.y = car.y;
   stepGame(g, playInput(), 30);
   g.banner = null; // the mission bar already names the job; keep the street clear
@@ -75,7 +77,7 @@ export function shotChase(g) {
   const mkCop = (dx, dy) => {
     const car = {
       id: `cop-shot-${dx}`, x: pink.x + dx, y: pink.y + dy,
-      angle: 0, speed: 400, color: '#2a2a3a', kind: 'police', w: 48, h: 22, steer: 0,
+      angle: 0, speed: 400, color: '#2a2a3a', kind: 'police', w: 56, h: 26, steer: 0,
     };
     g.copCars.push(car);
     g.cars.push(car);
@@ -101,8 +103,8 @@ export function shotEnd(g) {
   g.outcome = 'win';
   g.overTimer = 2;
   g.time = 30;
-  g.camera.x = g.world.places.home.x;
-  g.camera.y = g.world.places.home.y;
+  g.camera.x = g.world.places.showdown.x;
+  g.camera.y = g.world.places.showdown.y;
 }
 
 export const SHOTS = { start: shotStart, play: shotPlay, chase: shotChase, end: shotEnd };
